@@ -1,0 +1,20 @@
+{
+  "name": "prepsync",
+  "private": true,
+  "version": "0.1.0",
+  "description": "PrepSync - AI Interview Prep Kit generator (monorepo)",
+  "workspaces": [
+    "apps/web",
+    "apps/api",
+    "packages/core"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace=packages/core && npm run build --workspace=apps/api && npm run build --workspace=apps/web",
+    "dev": "concurrently -n api,web -c blue,green \"npm run dev --workspace=apps/api\" \"npm run dev --workspace=apps/web\"",
+    "test": "npm run test --workspace=packages/core",
+    "evaluate": "npm run build --workspace=packages/core && node packages/core/dist/batch/evaluate.js"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}
