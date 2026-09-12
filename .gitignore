@@ -2,7 +2,8 @@ node_modules/
 dist/
 .next/
 out/
-coverage/
+/coverage/
+packages/core/coverage/
 .env
 .env.local
 *.log
