@@ -37,5 +37,10 @@ export {
   markFlashcardEdited,
 } from "./merge/mergeRegeneration";
 
-export { runPipeline } from "./pipeline/runPipeline";
-export type { RunPipelineInput, RunPipelineOutput } from "./pipeline/runPipeline";
+export { runPipeline, PIPELINE_STEP_NAMES } from "./pipeline/runPipeline";
+export type {
+  RunPipelineInput,
+  RunPipelineOutput,
+  PipelineStepName,
+  OnStepCallback,
+} from "./pipeline/runPipeline";

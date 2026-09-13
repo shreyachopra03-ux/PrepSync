@@ -11,12 +11,34 @@ import { runCoverageLoop } from "../coverage/coverageLoop";
 import { buildSchedule } from "../schedule/buildSchedule";
 import { validateKit } from "../validate/index";
 
+export const PIPELINE_STEP_NAMES = [
+  "extractRole",
+  "crawlCompany",
+  "findHiringPage",
+  "searchPublicDiscussion",
+  "buildCompanyBrief",
+  "generateQuestions",
+  "coverageLoop",
+  "generateFlashcards",
+  "buildSchedule",
+  "validateKit",
+] as const;
+
+export type PipelineStepName = (typeof PIPELINE_STEP_NAMES)[number];
+
+export type OnStepCallback = (
+  step: PipelineStepName,
+  status: "running" | "done" | "failed",
+  note?: string
+) => void | Promise<void>;
+
 export interface RunPipelineInput {
   jd: string;
   companyUrl: string;
   companyName: string;
   days: number;
   llmClient: LLMClient;
+  onStep?: OnStepCallback;
 }
 
 export interface RunPipelineOutput {
@@ -24,37 +46,57 @@ export interface RunPipelineOutput {
   validationErrors: string[];
 }
 
+async function runStep<T>(
+  onStep: OnStepCallback | undefined,
+  step: PipelineStepName,
+  fn: () => Promise<T>
+): Promise<T> {
+  await onStep?.(step, "running");
+  try {
+    const result = await fn();
+    await onStep?.(step, "done");
+    return result;
+  } catch (error) {
+    const note = error instanceof Error ? error.message : String(error);
+    await onStep?.(step, "failed", note);
+    throw error;
+  }
+}
+
 export async function runPipeline(input: RunPipelineInput): Promise<RunPipelineOutput> {
-  const { jd, companyUrl, companyName, days, llmClient } = input;
+  const { jd, companyUrl, companyName, days, llmClient, onStep } = input;
 
-  const role = await extractRole(jd, llmClient);
+  const role = await runStep(onStep, "extractRole", () => extractRole(jd, llmClient));
 
-  const crawlResult = await crawlCompany(companyUrl);
-  const hiringPage = await findHiringPage(crawlResult.pages, llmClient);
-  const discussionSnippets = await searchPublicDiscussion(companyName);
+  const crawlResult = await runStep(onStep, "crawlCompany", () => crawlCompany(companyUrl));
 
-  const companyBrief = await buildCompanyBrief(
-    crawlResult,
-    hiringPage,
-    discussionSnippets,
-    llmClient
+  const hiringPage = await runStep(onStep, "findHiringPage", () =>
+    findHiringPage(crawlResult.pages, llmClient)
   );
 
-  const initialQuestions = await generateQuestions(
-    role.requirements,
-    hiringPage?.html ?? null,
-    llmClient
+  const discussionSnippets = await runStep(onStep, "searchPublicDiscussion", () =>
+    searchPublicDiscussion(companyName)
   );
 
-  const coverageResult = await runCoverageLoop(role.requirements, initialQuestions, llmClient);
-
-  const flashcards = await generateFlashcards(
-    role.requirements,
-    coverageResult.questions,
-    llmClient
+  const companyBrief = await runStep(onStep, "buildCompanyBrief", () =>
+    buildCompanyBrief(crawlResult, hiringPage, discussionSnippets, llmClient)
   );
 
-  const schedule = buildSchedule(role.requirements, coverageResult.questions, days);
+  const initialQuestions = await runStep(onStep, "generateQuestions", () =>
+    generateQuestions(role.requirements, hiringPage?.html ?? null, llmClient)
+  );
+
+  const coverageResult = await runStep(onStep, "coverageLoop", () =>
+    runCoverageLoop(role.requirements, initialQuestions, llmClient)
+  );
+
+  const flashcards = await runStep(onStep, "generateFlashcards", () =>
+    generateFlashcards(role.requirements, coverageResult.questions, llmClient)
+  );
+
+  const schedule = await runStep(onStep, "buildSchedule", async () =>
+    buildSchedule(role.requirements, coverageResult.questions, days)
+  );
 
   const pagesUsed = crawlResult.pages.map((page) => page.url);
 
@@ -80,7 +122,7 @@ export async function runPipeline(input: RunPipelineInput): Promise<RunPipelineO
     },
   };
 
-  const validation = validateKit(kit);
+  const validation = await runStep(onStep, "validateKit", async () => validateKit(kit));
 
   return { kit, validationErrors: validation.errors };
 }
