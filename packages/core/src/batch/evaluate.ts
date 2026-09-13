@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { readFile, writeFile } from "fs/promises";
 import pLimit from "p-limit";
 import { GeminiClient } from "../llm/GeminiClient";

@@ -3,7 +3,7 @@ import type { LLMClient } from "./LLMClient";
 import { TokenBucket } from "./tokenBucket";
 import { withBackoff } from "./backoff";
 
-const MODEL_NAME = "gemini-2.5-flash";
+const MODEL_NAME = "gemini-3.6-flash";
 const CHARS_PER_TOKEN_ESTIMATE = 4;
 
 export interface GeminiClientOptions {
