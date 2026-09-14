@@ -23,8 +23,13 @@ export function ScheduleDay({ day, questions }: ScheduleDayProps) {
           {day.question_ids.map((id) => {
             const question = questionsById.get(id);
             return (
-              <li key={id} className="truncate text-xs text-gray-600">
-                {question ? question.prompt : id}
+              <li key={id}>
+                <a
+                  href={`#question-${id}`}
+                  className="block text-xs text-gray-600 hover:text-brand-600 hover:underline focus-visible:outline-2 focus-visible:outline-brand-500"
+                >
+                  {question ? question.prompt : id}
+                </a>
               </li>
             );
           })}

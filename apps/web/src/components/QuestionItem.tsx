@@ -36,7 +36,7 @@ export function QuestionItem({
   }
 
   return (
-    <li className="rounded-md border border-gray-200 bg-white p-4">
+    <li id={`question-${question.id}`} className="scroll-mt-4 rounded-md border border-gray-200 bg-white p-4">
       <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-gray-500">
         <span className="rounded-full bg-gray-100 px-2 py-0.5">{question.category}</span>
         <span className="rounded-full bg-gray-100 px-2 py-0.5">
