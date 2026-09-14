@@ -3,10 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { getKit, patchKit, regenerateSection, ApiError } from "../../../lib/api";
-import type { Kit, Question } from "../../../lib/types";
+import type { Kit, Question, Flashcard } from "../../../lib/types";
 import { LoadingState } from "../../../components/LoadingState";
 import { ErrorBanner } from "../../../components/ErrorBanner";
 import { QuestionItem } from "../../../components/QuestionItem";
+import { FlashcardItem } from "../../../components/FlashcardItem";
 import { RegenerateButton } from "../../../components/RegenerateButton";
 import { ScheduleDay } from "../../../components/ScheduleDay";
 
@@ -17,7 +18,8 @@ export default function KitViewPage({ params }: { params: { id: string } }) {
   const [kit, setKit] = useState<Kit | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [regenerating, setRegenerating] = useState<"questions" | "flashcards" | null>(null);
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveQuestionsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveFlashcardsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   async function load() {
     setError(null);
@@ -38,8 +40,8 @@ export default function KitViewPage({ params }: { params: { id: string } }) {
     const optimisticKit = { ...kit, questions: nextQuestions };
     setKit(optimisticKit);
 
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(async () => {
+    if (saveQuestionsTimer.current) clearTimeout(saveQuestionsTimer.current);
+    saveQuestionsTimer.current = setTimeout(async () => {
       try {
         const result = await patchKit(kitId, optimisticKit.version, { questions: nextQuestions });
         setKit(result.kit);
@@ -63,6 +65,38 @@ export default function KitViewPage({ params }: { params: { id: string } }) {
   function handleTogglePin(id: string) {
     if (!kit) return;
     scheduleSave(kit.questions.map((q) => (q.id === id ? { ...q, pinned: !q.pinned } : q)));
+  }
+
+  function scheduleSaveFlashcards(nextFlashcards: Flashcard[]) {
+    if (!kit) return;
+    const optimisticKit = { ...kit, flashcards: nextFlashcards };
+    setKit(optimisticKit);
+
+    if (saveFlashcardsTimer.current) clearTimeout(saveFlashcardsTimer.current);
+    saveFlashcardsTimer.current = setTimeout(async () => {
+      try {
+        const result = await patchKit(kitId, optimisticKit.version, { flashcards: nextFlashcards });
+        setKit(result.kit);
+      } catch (err) {
+        setError(err instanceof ApiError ? err.message : "Failed to save your changes");
+      }
+    }, SAVE_DEBOUNCE_MS);
+  }
+
+  function handleFlashcardEdit(updated: Flashcard) {
+    if (!kit) return;
+    const edited: Flashcard = { ...updated, origin: "edited" };
+    scheduleSaveFlashcards(kit.flashcards.map((f) => (f.id === edited.id ? edited : f)));
+  }
+
+  function handleFlashcardDelete(id: string) {
+    if (!kit) return;
+    scheduleSaveFlashcards(kit.flashcards.filter((f) => f.id !== id));
+  }
+
+  function handleFlashcardTogglePin(id: string) {
+    if (!kit) return;
+    scheduleSaveFlashcards(kit.flashcards.map((f) => (f.id === id ? { ...f, pinned: !f.pinned } : f)));
   }
 
   function handleMove(id: string, direction: -1 | 1) {
@@ -217,10 +251,13 @@ export default function KitViewPage({ params }: { params: { id: string } }) {
         ) : (
           <ul className="grid gap-3 sm:grid-cols-2">
             {kit.flashcards.map((f) => (
-              <li key={f.id} className="rounded-md border border-gray-200 bg-white p-3">
-                <p className="text-sm font-medium text-gray-900">{f.front}</p>
-                <p className="mt-1 text-sm text-gray-600">{f.back}</p>
-              </li>
+              <FlashcardItem
+                key={f.id}
+                flashcard={f}
+                onEdit={handleFlashcardEdit}
+                onDelete={() => handleFlashcardDelete(f.id)}
+                onTogglePin={() => handleFlashcardTogglePin(f.id)}
+              />
             ))}
           </ul>
         )}
