@@ -11,10 +11,19 @@ const EnvSchema = z.object({
   JWT_SECRET: z.string().min(1, "JWT_SECRET is required"),
   GEMINI_API_KEY: z.string().min(1, "GEMINI_API_KEY is required"),
   TAVILY_API_KEY: z.string().optional(),
+  FRONTEND_URL: z.string().optional(),
   ALLOW_PRIVATE_HOSTS: z
     .enum(["true", "false"])
     .default("false")
     .transform((value) => value === "true"),
+}).superRefine((data, ctx) => {
+  if (data.NODE_ENV === "production" && !data.FRONTEND_URL) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["FRONTEND_URL"],
+      message: "FRONTEND_URL is required in production (used for CORS)",
+    });
+  }
 });
 
 function loadEnv() {

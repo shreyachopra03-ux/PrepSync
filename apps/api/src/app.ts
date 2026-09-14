@@ -11,9 +11,11 @@ import { notFoundHandler, errorHandler } from "./middleware/errorHandler";
 export function createApp() {
   const app = express();
 
+  const allowedOrigin = env.FRONTEND_URL?.trim().replace(/\/+$/, "");
+
   app.use(
     cors({
-      origin: env.NODE_ENV === "production" ? undefined : true,
+      origin: env.NODE_ENV === "production" ? allowedOrigin : true,
       credentials: true,
     })
   );
