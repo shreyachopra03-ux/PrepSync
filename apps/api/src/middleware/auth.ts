@@ -21,10 +21,11 @@ export function signAuthToken(payload: AuthPayload): string {
 }
 
 export function authCookieOptions() {
+  const isProduction = env.NODE_ENV === "production";
   return {
     httpOnly: true,
-    sameSite: "lax" as const,
-    secure: env.NODE_ENV === "production",
+    sameSite: isProduction ? ("none" as const) : ("lax" as const),
+    secure: isProduction,
     maxAge: 7 * 24 * 60 * 60 * 1000,
   };
 }
