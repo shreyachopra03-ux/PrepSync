@@ -1,0 +1,24 @@
+{
+  "name": "@prepsync/worker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PrepSync API on Cloudflare Workers (Hono + D1 + Workflows)",
+  "scripts": {
+    "build:core": "npm --prefix ../../packages/core run build",
+    "predev": "npm run build:core",
+    "dev": "wrangler dev",
+    "predeploy": "npm run build:core",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "db:migrate:local": "wrangler d1 migrations apply prepsync --local",
+    "db:migrate:remote": "wrangler d1 migrations apply prepsync --remote"
+  },
+  "dependencies": {
+    "hono": "^4.13.8"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260918.1",
+    "typescript": "^5.5.4",
+    "wrangler": "^4.135.0"
+  }
+}

@@ -10,6 +10,7 @@ import { generateFlashcards } from "../generate/generateFlashcards";
 import { runCoverageLoop } from "../coverage/coverageLoop";
 import { buildSchedule } from "../schedule/buildSchedule";
 import { validateKit } from "../validate/index";
+import { inlineRunStep, type RunStep } from "./runStep";
 
 export const PIPELINE_STEP_NAMES = [
   "extractRole",
@@ -32,6 +33,15 @@ export type OnStepCallback = (
   note?: string
 ) => void | Promise<void>;
 
+export interface PipelineLimits {
+  maxPages?: number;
+  maxDepth?: number;
+  crawlConcurrency?: number;
+  maxPageBytes?: number;
+  hiringCandidates?: number;
+  allowHiringRefetch?: boolean;
+}
+
 export interface RunPipelineInput {
   jd: string;
   companyUrl: string;
@@ -39,6 +49,8 @@ export interface RunPipelineInput {
   days: number;
   llmClient: LLMClient;
   onStep?: OnStepCallback;
+  runStep?: RunStep;
+  limits?: PipelineLimits;
 }
 
 export interface RunPipelineOutput {
@@ -46,7 +58,7 @@ export interface RunPipelineOutput {
   validationErrors: string[];
 }
 
-async function runStep<T>(
+async function stage<T>(
   onStep: OnStepCallback | undefined,
   step: PipelineStepName,
   fn: () => Promise<T>
@@ -64,41 +76,63 @@ async function runStep<T>(
 }
 
 export async function runPipeline(input: RunPipelineInput): Promise<RunPipelineOutput> {
-  const { jd, companyUrl, companyName, days, llmClient, onStep } = input;
+  const { jd, companyUrl, companyName, days, llmClient, onStep, limits = {} } = input;
+  const run = input.runStep ?? inlineRunStep;
 
-  const role = await runStep(onStep, "extractRole", () => extractRole(jd, llmClient));
-
-  const crawlResult = await runStep(onStep, "crawlCompany", () => crawlCompany(companyUrl));
-
-  const hiringPage = await runStep(onStep, "findHiringPage", () =>
-    findHiringPage(crawlResult.pages, llmClient)
+  const role = await stage(onStep, "extractRole", () =>
+    run("extract-role", () => extractRole(jd, llmClient))
   );
 
-  const discussionSnippets = await runStep(onStep, "searchPublicDiscussion", () =>
-    searchPublicDiscussion(companyName)
+  const crawlResult = await stage(onStep, "crawlCompany", () =>
+    crawlCompany(
+      companyUrl,
+      {
+        maxPages: limits.maxPages,
+        maxDepth: limits.maxDepth,
+        concurrency: limits.crawlConcurrency,
+        maxPageBytes: limits.maxPageBytes,
+      },
+      run
+    )
   );
 
-  const companyBrief = await runStep(onStep, "buildCompanyBrief", () =>
-    buildCompanyBrief(crawlResult, hiringPage, discussionSnippets, llmClient)
+  const hiringPage = await stage(onStep, "findHiringPage", () =>
+    findHiringPage(
+      crawlResult.pages,
+      crawlResult.ranked,
+      llmClient,
+      { candidates: limits.hiringCandidates, allowRefetch: limits.allowHiringRefetch },
+      run
+    )
   );
 
-  const initialQuestions = await runStep(onStep, "generateQuestions", () =>
-    generateQuestions(role.requirements, hiringPage?.html ?? null, llmClient)
+  const discussionSnippets = await stage(onStep, "searchPublicDiscussion", () =>
+    run("search-discussion", () => searchPublicDiscussion(companyName))
   );
 
-  const coverageResult = await runStep(onStep, "coverageLoop", () =>
-    runCoverageLoop(role.requirements, initialQuestions, llmClient)
+  const companyBrief = await stage(onStep, "buildCompanyBrief", () =>
+    run("company-brief", () =>
+      buildCompanyBrief(crawlResult, hiringPage, discussionSnippets, llmClient)
+    )
   );
 
-  const flashcards = await runStep(onStep, "generateFlashcards", () =>
-    generateFlashcards(role.requirements, coverageResult.questions, llmClient)
+  const initialQuestions = await stage(onStep, "generateQuestions", () =>
+    generateQuestions(role.requirements, hiringPage?.html ?? null, llmClient, run)
   );
 
-  const schedule = await runStep(onStep, "buildSchedule", async () =>
-    buildSchedule(role.requirements, coverageResult.questions, days)
+  const coverageResult = await stage(onStep, "coverageLoop", () =>
+    runCoverageLoop(role.requirements, initialQuestions, llmClient, run)
   );
 
-  const pagesUsed = crawlResult.pages.map((page) => page.url);
+  const flashcards = await stage(onStep, "generateFlashcards", () =>
+    run("flashcards", () => generateFlashcards(role.requirements, coverageResult.questions, llmClient))
+  );
+
+  const schedule = await stage(onStep, "buildSchedule", () =>
+    run("build-schedule", async () =>
+      buildSchedule(role.requirements, coverageResult.questions, days)
+    )
+  );
 
   const kit: Kit = {
     version: 1,
@@ -109,7 +143,7 @@ export async function runPipeline(input: RunPipelineInput): Promise<RunPipelineO
       location: "",
       jd_chars: jd.length,
       researched_at: new Date().toISOString(),
-      pages_used: pagesUsed,
+      pages_used: crawlResult.pages.map((page) => page.url),
     },
     company_brief: companyBrief,
     role,
@@ -122,7 +156,9 @@ export async function runPipeline(input: RunPipelineInput): Promise<RunPipelineO
     },
   };
 
-  const validation = await runStep(onStep, "validateKit", async () => validateKit(kit));
+  const validation = await stage(onStep, "validateKit", () =>
+    run("validate-kit", async () => validateKit(kit))
+  );
 
   return { kit, validationErrors: validation.errors };
 }

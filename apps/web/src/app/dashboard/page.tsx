@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { listKits, logout, ApiError } from "../../lib/api";
-import type { Kit } from "../../lib/types";
+import type { KitSummary } from "../../lib/types";
 import { KitCard } from "../../components/KitCard";
 import { LoadingState } from "../../components/LoadingState";
 import { ErrorBanner } from "../../components/ErrorBanner";
@@ -12,7 +12,7 @@ import { EmptyState } from "../../components/EmptyState";
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [kits, setKits] = useState<Kit[] | null>(null);
+  const [kits, setKits] = useState<KitSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function handleLogout() {

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { LLMClient } from "../llm/LLMClient";
 import { parseJsonWithRepair } from "../llm/repairJson";
+import { inlineRunStep, type RunStep } from "../pipeline/runStep";
 import type { Requirement, Question, RequirementKind } from "../validate/kitSchema";
 
 const QuestionDraftSchema = z.object({
@@ -13,7 +14,9 @@ const QuestionDraftSchema = z.object({
 
 const QuestionDraftsSchema = z.array(QuestionDraftSchema);
 
-function groupByKind(requirements: Requirement[]): Map<RequirementKind, Requirement[]> {
+export type QuestionDraft = z.infer<typeof QuestionDraftSchema>;
+
+export function groupByKind(requirements: Requirement[]): Map<RequirementKind, Requirement[]> {
   const groups = new Map<RequirementKind, Requirement[]>();
   for (const requirement of requirements) {
     const existing = groups.get(requirement.kind) ?? [];
@@ -58,37 +61,47 @@ function buildPrompt(
   ].join("\n\n");
 }
 
-export async function generateQuestions(
+export async function generateQuestionDrafts(
+  kind: RequirementKind,
   requirements: Requirement[],
   hiringPageContent: string | null,
   llmClient: LLMClient
+): Promise<QuestionDraft[]> {
+  const prompt = buildPrompt(kind, requirements, hiringPageContent);
+  const rawText = await llmClient.generateText(prompt);
+  const drafts = await parseJsonWithRepair(rawText, QuestionDraftsSchema, llmClient, prompt);
+  return drafts ?? [];
+}
+
+export function assembleQuestions(drafts: QuestionDraft[]): Question[] {
+  return drafts.map((draft, index) => ({
+    id: `q${index + 1}`,
+    requirement_ids: draft.requirement_ids,
+    category: draft.category,
+    prompt: draft.prompt,
+    answer_outline: draft.answer_outline,
+    difficulty: draft.difficulty,
+    origin: "generated",
+    pinned: false,
+    order: index,
+    rev: 1,
+  }));
+}
+
+export async function generateQuestions(
+  requirements: Requirement[],
+  hiringPageContent: string | null,
+  llmClient: LLMClient,
+  runStep: RunStep = inlineRunStep
 ): Promise<Question[]> {
-  const groups = groupByKind(requirements);
-  const questions: Question[] = [];
-  let order = 0;
+  const drafts: QuestionDraft[] = [];
 
-  for (const [kind, groupRequirements] of groups) {
-    const prompt = buildPrompt(kind, groupRequirements, hiringPageContent);
-    const rawText = await llmClient.generateText(prompt);
-    const drafts = await parseJsonWithRepair(rawText, QuestionDraftsSchema, llmClient, prompt);
-
-    if (!drafts) continue;
-
-    for (const draft of drafts) {
-      questions.push({
-        id: `q${questions.length + 1}`,
-        requirement_ids: draft.requirement_ids,
-        category: draft.category,
-        prompt: draft.prompt,
-        answer_outline: draft.answer_outline,
-        difficulty: draft.difficulty,
-        origin: "generated",
-        pinned: false,
-        order: order++,
-        rev: 1,
-      });
-    }
+  for (const [kind, groupRequirements] of groupByKind(requirements)) {
+    const groupDrafts = await runStep(`questions-${kind}`, () =>
+      generateQuestionDrafts(kind, groupRequirements, hiringPageContent, llmClient)
+    );
+    drafts.push(...groupDrafts);
   }
 
-  return questions;
+  return assembleQuestions(drafts);
 }

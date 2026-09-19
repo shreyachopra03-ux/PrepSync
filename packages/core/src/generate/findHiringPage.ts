@@ -1,11 +1,12 @@
 import { z } from "zod";
-import type { CrawledPage } from "../retrieval/crawler";
-import { rankLinks } from "../retrieval/linkRanker";
-import { fetchPage } from "../retrieval/fetcher";
 import type { LLMClient } from "../llm/LLMClient";
 import { parseJsonWithRepair } from "../llm/repairJson";
+import { inlineRunStep, type RunStep } from "../pipeline/runStep";
+import { PAGE_HEAD_CHARS, type CrawledPage } from "../retrieval/crawler";
+import { fetchPage } from "../retrieval/fetcher";
+import type { ScoredLink } from "../retrieval/linkRanker";
 
-const TOP_CANDIDATES = 5;
+const DEFAULT_CANDIDATES = 5;
 
 const ClassificationSchema = z.object({
   category: z.enum(["hiring", "about", "neither"]),
@@ -14,6 +15,15 @@ const ClassificationSchema = z.object({
 export interface HiringPageResult {
   url: string;
   html: string;
+}
+
+export interface HiringLimits {
+  candidates?: number;
+  allowRefetch?: boolean;
+}
+
+interface ClassifiedCandidate extends HiringPageResult {
+  category: string;
 }
 
 function buildClassifyPrompt(html: string): string {
@@ -25,7 +35,7 @@ function buildClassifyPrompt(html: string): string {
     "Return JSON only, no prose, no code fences, matching this shape:",
     '{ "category": "hiring" | "about" | "neither" }',
     "Page content:",
-    html.slice(0, 8000),
+    html.slice(0, PAGE_HEAD_CHARS),
   ].join("\n\n");
 }
 
@@ -36,30 +46,52 @@ async function classifyPage(html: string, llmClient: LLMClient): Promise<string>
   return result?.category ?? "neither";
 }
 
-export async function findHiringPage(
+export function pickHiringCandidates(
+  ranked: ScoredLink[],
   pages: CrawledPage[],
-  llmClient: LLMClient
-): Promise<HiringPageResult | null> {
-  const ranked = rankLinks(pages);
-  const pagesByUrl = new Map(pages.map((page) => [page.url, page]));
+  limits: HiringLimits = {}
+): string[] {
+  const limit = limits.candidates ?? DEFAULT_CANDIDATES;
+  const crawled = new Set(pages.map((page) => page.url));
+  const urls: string[] = [];
 
-  const seen = new Set<string>();
-  const candidates = [];
   for (const link of ranked) {
-    if (seen.has(link.url)) continue;
-    seen.add(link.url);
-    candidates.push(link.url);
-    if (candidates.length >= TOP_CANDIDATES) break;
+    if (limits.allowRefetch === false && !crawled.has(link.url)) continue;
+    if (urls.includes(link.url)) continue;
+    urls.push(link.url);
+    if (urls.length >= limit) break;
   }
 
-  for (const url of candidates) {
-    const alreadyCrawled = pagesByUrl.get(url);
-    const html = alreadyCrawled ? alreadyCrawled.html : (await fetchPage(url))?.html;
-    if (!html) continue;
+  return urls;
+}
 
-    const category = await classifyPage(html, llmClient);
-    if (category === "hiring") {
-      return { url, html };
+export async function findHiringPage(
+  pages: CrawledPage[],
+  ranked: ScoredLink[],
+  llmClient: LLMClient,
+  limits: HiringLimits = {},
+  runStep: RunStep = inlineRunStep
+): Promise<HiringPageResult | null> {
+  const pagesByUrl = new Map(pages.map((page) => [page.url, page]));
+  const candidates = pickHiringCandidates(ranked, pages, limits);
+
+  for (let index = 0; index < candidates.length; index++) {
+    const url = candidates[index];
+
+    const result = await runStep(
+      `hiring-classify-${index + 1}`,
+      async (): Promise<ClassifiedCandidate | null> => {
+        const crawled = pagesByUrl.get(url);
+        const html = crawled ? crawled.html : (await fetchPage(url))?.html;
+        if (!html) return null;
+
+        const category = await classifyPage(html, llmClient);
+        return { url, html: html.slice(0, PAGE_HEAD_CHARS), category };
+      }
+    );
+
+    if (result && result.category === "hiring") {
+      return { url: result.url, html: result.html };
     }
   }
 

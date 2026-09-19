@@ -1,12 +1,14 @@
 import Link from "next/link";
-import type { Kit } from "../lib/types";
+import type { KitSummary } from "../lib/types";
 
 interface KitCardProps {
-  kit: Kit;
+  kit: KitSummary;
 }
 
 export function KitCard({ kit }: KitCardProps) {
-  const uncoveredCount = kit.coverage.uncovered_requirement_ids.length;
+  const uncoveredCount = kit.uncoveredCount ?? kit.coverage?.uncovered_requirement_ids.length ?? 0;
+  const questionCount = kit.questionCount ?? kit.questions?.length ?? 0;
+  const flashcardCount = kit.flashcardCount ?? kit.flashcards?.length ?? 0;
 
   return (
     <Link
@@ -18,8 +20,8 @@ export function KitCard({ kit }: KitCardProps) {
 
       <div className="mt-3 flex items-center gap-4 text-xs text-gray-500">
         <span>{kit.schedule.days_available} day plan</span>
-        <span>{kit.questions.length} questions</span>
-        <span>{kit.flashcards.length} flashcards</span>
+        <span>{questionCount} questions</span>
+        <span>{flashcardCount} flashcards</span>
       </div>
 
       {uncoveredCount > 0 && (

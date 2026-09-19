@@ -109,3 +109,16 @@ export interface PracticeProgress {
   coveredRequirementIds: string[];
   uncoveredRequirementIds: string[];
 }
+
+export interface KitSummary {
+  _id: string;
+  source: { company: string };
+  role: { title: string };
+  schedule: { days_available: number };
+  questionCount?: number;
+  flashcardCount?: number;
+  uncoveredCount?: number;
+  questions?: unknown[];
+  flashcards?: unknown[];
+  coverage?: { uncovered_requirement_ids: string[] };
+}

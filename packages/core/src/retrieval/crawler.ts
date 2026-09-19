@@ -1,117 +1,207 @@
-import * as cheerio from "cheerio";
-import pLimit from "p-limit";
+import { inlineRunStep, type RunStep } from "../pipeline/runStep";
 import { fetchPage } from "./fetcher";
-import { fetchRobotsRules } from "./robots";
+import { extractLinks, type ExtractedLink } from "./htmlLinks";
+import { mergeScoredLinks, scoreLinks, sortScoredLinks, type ScoredLink } from "./linkRanker";
+import { fetchRobotsText, parseRobots } from "./robots";
 
-const MAX_DEPTH = 2;
-const MAX_PAGES = 20;
-const CONCURRENCY = 2;
+export const PAGE_HEAD_CHARS = 8000;
+
+const DEFAULT_MAX_DEPTH = 2;
+const DEFAULT_MAX_PAGES = 20;
+const DEFAULT_CONCURRENCY = 2;
+const MAX_QUEUE = 150;
+const MAX_SKIPPED = 50;
 
 export interface CrawledPage {
   url: string;
   html: string;
-  links: { url: string; anchorText: string }[];
+}
+
+export interface SkippedPage {
+  url: string;
+  reason: string;
+}
+
+export interface CrawlOptions {
+  maxPages?: number;
+  maxDepth?: number;
+  concurrency?: number;
+  maxPageBytes?: number;
+}
+
+export interface CrawlState {
+  startUrl: string;
+  origin: string;
+  robotsTxt: string | null;
+  crawlDelayMs: number;
+  queue: { url: string; depth: number }[];
+  seen: string[];
+  pages: CrawledPage[];
+  ranked: Record<string, ScoredLink>;
+  skipped: SkippedPage[];
+  attempts: number;
+  maxPages: number;
+  maxDepth: number;
 }
 
 export interface CrawlResult {
   pages: CrawledPage[];
-  skipped: { url: string; reason: string }[];
+  skipped: SkippedPage[];
+  ranked: ScoredLink[];
 }
 
-function extractLinks(baseUrl: string, html: string): { url: string; anchorText: string }[] {
-  const $ = cheerio.load(html);
-  const links: { url: string; anchorText: string }[] = [];
-
-  $("a[href]").each((_, el) => {
-    const href = $(el).attr("href");
-    if (!href) return;
-    try {
-      const resolved = new URL(href, baseUrl).toString();
-      links.push({ url: resolved, anchorText: $(el).text().trim() });
-    } catch {
-      return;
-    }
-  });
-
-  return links;
+interface ItemResult {
+  attempted: boolean;
+  skip?: SkippedPage;
+  page?: CrawledPage;
+  links?: ExtractedLink[];
+  depth?: number;
 }
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export async function crawlCompany(startUrl: string): Promise<CrawlResult> {
-  const pages: CrawledPage[] = [];
-  const skipped: CrawlResult["skipped"] = [];
-  const visited = new Set<string>();
+function withoutHash(url: string): string {
+  const parsed = new URL(url);
+  parsed.hash = "";
+  return parsed.toString();
+}
+
+export async function initCrawl(startUrl: string, options: CrawlOptions = {}): Promise<CrawlState> {
+  const maxPages = options.maxPages ?? DEFAULT_MAX_PAGES;
+  const maxDepth = options.maxDepth ?? DEFAULT_MAX_DEPTH;
 
   let origin: string;
+  let first: string;
   try {
     origin = new URL(startUrl).origin;
+    first = withoutHash(startUrl);
   } catch {
-    return { pages, skipped: [{ url: startUrl, reason: "invalid url" }] };
+    return {
+      startUrl,
+      origin: "",
+      robotsTxt: null,
+      crawlDelayMs: 0,
+      queue: [],
+      seen: [],
+      pages: [],
+      ranked: {},
+      skipped: [{ url: startUrl, reason: "invalid url" }],
+      attempts: 0,
+      maxPages,
+      maxDepth,
+    };
   }
 
-  const robotsRules = await fetchRobotsRules(startUrl);
-  const limit = pLimit(CONCURRENCY);
+  const robotsTxt = await fetchRobotsText(startUrl);
+  const rules = parseRobots(startUrl, robotsTxt);
 
-  let queue: { url: string; depth: number }[] = [{ url: startUrl, depth: 0 }];
+  return {
+    startUrl,
+    origin,
+    robotsTxt,
+    crawlDelayMs: rules.crawlDelayMs,
+    queue: [{ url: first, depth: 0 }],
+    seen: [first],
+    pages: [],
+    ranked: {},
+    skipped: [],
+    attempts: 0,
+    maxPages,
+    maxDepth,
+  };
+}
 
-  while (queue.length > 0 && pages.length < MAX_PAGES) {
-    const batch = queue.slice(0, MAX_PAGES - pages.length);
-    queue = queue.slice(batch.length);
+export function crawlFinished(state: CrawlState): boolean {
+  return state.queue.length === 0 || state.attempts >= state.maxPages;
+}
 
-    const results = await Promise.all(
-      batch.map((item) =>
-        limit(async () => {
-          if (visited.has(item.url)) return null;
-          visited.add(item.url);
+export async function crawlStep(state: CrawlState, options: CrawlOptions = {}): Promise<CrawlState> {
+  if (crawlFinished(state)) return state;
 
-          let itemOrigin: string;
-          try {
-            itemOrigin = new URL(item.url).origin;
-          } catch {
-            skipped.push({ url: item.url, reason: "invalid url" });
-            return null;
-          }
+  const concurrency = options.concurrency ?? DEFAULT_CONCURRENCY;
+  const rules = parseRobots(state.startUrl, state.robotsTxt);
 
-          if (itemOrigin !== origin) {
-            skipped.push({ url: item.url, reason: "cross-origin" });
-            return null;
-          }
+  const queue = [...state.queue];
+  const batch = queue.splice(0, Math.min(concurrency, state.maxPages - state.attempts, queue.length));
 
-          if (!robotsRules.isAllowed(item.url)) {
-            skipped.push({ url: item.url, reason: "disallowed by robots.txt" });
-            return null;
-          }
+  const results: ItemResult[] = await Promise.all(
+    batch.map(async (item): Promise<ItemResult> => {
+      if (!item.url.startsWith(`${state.origin}/`)) {
+        return { attempted: false, skip: { url: item.url, reason: "cross-origin" } };
+      }
+      if (!rules.isAllowed(item.url)) {
+        return { attempted: false, skip: { url: item.url, reason: "disallowed by robots.txt" } };
+      }
 
-          await sleep(robotsRules.crawlDelayMs);
+      await sleep(state.crawlDelayMs);
 
-          const page = await fetchPage(item.url);
-          if (!page) {
-            skipped.push({ url: item.url, reason: "fetch failed" });
-            return null;
-          }
+      const page = await fetchPage(item.url, {
+        maxBytes: options.maxPageBytes,
+        truncate: options.maxPageBytes !== undefined,
+      });
+      if (!page) {
+        return { attempted: true, skip: { url: item.url, reason: "fetch failed" } };
+      }
 
-          const links = extractLinks(item.url, page.html);
-          return { crawled: { url: item.url, html: page.html, links }, depth: item.depth };
-        })
-      )
-    );
+      return {
+        attempted: true,
+        page: { url: item.url, html: page.html.slice(0, PAGE_HEAD_CHARS) },
+        links: extractLinks(page.html, item.url),
+        depth: item.depth,
+      };
+    })
+  );
 
-    for (const result of results) {
-      if (!result) continue;
-      pages.push(result.crawled);
+  const pages = [...state.pages];
+  const skipped = [...state.skipped];
+  const seen = new Set(state.seen);
+  let ranked = state.ranked;
+  let attempts = state.attempts;
 
-      if (result.depth < MAX_DEPTH) {
-        for (const link of result.crawled.links) {
-          if (!visited.has(link.url)) {
-            queue.push({ url: link.url, depth: result.depth + 1 });
-          }
-        }
+  for (const result of results) {
+    if (result.attempted) attempts++;
+    if (result.skip && skipped.length < MAX_SKIPPED) skipped.push(result.skip);
+    if (!result.page || !result.links) continue;
+
+    pages.push(result.page);
+    ranked = mergeScoredLinks(ranked, scoreLinks(result.links));
+
+    if ((result.depth ?? 0) < state.maxDepth) {
+      for (const link of result.links) {
+        if (queue.length >= MAX_QUEUE) break;
+        if (!link.url.startsWith(`${state.origin}/`) || seen.has(link.url)) continue;
+        seen.add(link.url);
+        queue.push({ url: link.url, depth: (result.depth ?? 0) + 1 });
       }
     }
   }
 
-  return { pages, skipped };
+  return { ...state, queue, seen: Array.from(seen), pages, ranked, skipped, attempts };
+}
+
+export function toCrawlResult(state: CrawlState): CrawlResult {
+  return {
+    pages: state.pages,
+    skipped: state.skipped,
+    ranked: sortScoredLinks(state.ranked),
+  };
+}
+
+export async function crawlCompany(
+  startUrl: string,
+  options: CrawlOptions = {},
+  runStep: RunStep = inlineRunStep
+): Promise<CrawlResult> {
+  let state = await runStep("crawl-init", () => initCrawl(startUrl, options));
+
+  let index = 0;
+  while (!crawlFinished(state)) {
+    const current = state;
+    index += 1;
+    state = await runStep(`crawl-page-${index}`, () => crawlStep(current, options));
+  }
+
+  return toCrawlResult(state);
 }

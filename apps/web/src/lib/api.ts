@@ -1,6 +1,30 @@
-import type { Kit, Run, User, PracticeProgress, Flashcard } from "./types";
+import type { Kit, KitSummary, Run, User, PracticeProgress, Flashcard } from "./types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+
+const USE_CLIENT_KDF = process.env.NEXT_PUBLIC_CLIENT_KDF === "true";
+const KDF_ITERATIONS = 300_000;
+
+function toBase64Url(bytes: Uint8Array): string {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+async function passwordProof(email: string, password: string): Promise<string> {
+  if (!USE_CLIENT_KDF) return password;
+
+  const salt = new TextEncoder().encode(`prepsync:v1:${email.trim().toLowerCase()}`);
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, [
+    "deriveBits",
+  ]);
+  const bits = await crypto.subtle.deriveBits(
+    { name: "PBKDF2", hash: "SHA-256", salt, iterations: KDF_ITERATIONS },
+    key,
+    256
+  );
+  return toBase64Url(new Uint8Array(bits));
+}
 
 export class ApiError extends Error {
   status: number;
@@ -30,12 +54,14 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return body as T;
 }
 
-export function register(email: string, password: string): Promise<{ user: User }> {
-  return request("/auth/register", { method: "POST", body: JSON.stringify({ email, password }) });
+export async function register(email: string, password: string): Promise<{ user: User }> {
+  const proof = await passwordProof(email, password);
+  return request("/auth/register", { method: "POST", body: JSON.stringify({ email, password: proof }) });
 }
 
-export function login(email: string, password: string): Promise<{ user: User }> {
-  return request("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
+export async function login(email: string, password: string): Promise<{ user: User }> {
+  const proof = await passwordProof(email, password);
+  return request("/auth/login", { method: "POST", body: JSON.stringify({ email, password: proof }) });
 }
 
 export function logout(): Promise<{ ok: boolean }> {
@@ -57,7 +83,7 @@ export function createKit(input: CreateKitInput): Promise<{ runId: string; statu
   return request("/kits", { method: "POST", body: JSON.stringify(input) });
 }
 
-export function listKits(): Promise<{ kits: Kit[] }> {
+export function listKits(): Promise<{ kits: KitSummary[] }> {
   return request("/kits");
 }
 

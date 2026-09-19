@@ -1,5 +1,5 @@
-import * as cheerio from "cheerio";
 import { fetchPage } from "../retrieval/fetcher";
+import { parseAnchors, readAttribute, textFromHtml } from "../retrieval/htmlLinks";
 
 const MAX_RESULTS = 5;
 
@@ -42,26 +42,40 @@ async function searchWithTavily(
   }));
 }
 
+function normaliseDuckDuckGoUrl(href: string): string {
+  const absolute = href.startsWith("//") ? `https:${href}` : href;
+  try {
+    const target = new URL(absolute).searchParams.get("uddg");
+    return target ?? absolute;
+  } catch {
+    return absolute;
+  }
+}
+
 async function searchWithDuckDuckGo(query: string): Promise<DiscussionSnippet[] | null> {
   const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
   const page = await fetchPage(url);
   if (!page) return null;
 
-  const $ = cheerio.load(page.html);
-  const snippets: DiscussionSnippet[] = [];
+  const results: DiscussionSnippet[] = [];
 
-  $(".result").each((_, el) => {
-    if (snippets.length >= MAX_RESULTS) return;
-    const titleEl = $(el).find(".result__a");
-    const title = titleEl.text().trim();
-    const href = titleEl.attr("href");
-    const snippet = $(el).find(".result__snippet").text().trim();
-    if (title && href) {
-      snippets.push({ title, url: href, snippet });
+  for (const anchor of parseAnchors(page.html)) {
+    const className = readAttribute(anchor.attrs, "class") ?? "";
+
+    if (className.includes("result__a")) {
+      if (results.length >= MAX_RESULTS) break;
+      const href = readAttribute(anchor.attrs, "href");
+      const title = textFromHtml(anchor.inner);
+      if (href && title) {
+        results.push({ title, url: normaliseDuckDuckGoUrl(href), snippet: "" });
+      }
+    } else if (className.includes("result__snippet") && results.length > 0) {
+      const last = results[results.length - 1];
+      if (!last.snippet) last.snippet = textFromHtml(anchor.inner);
     }
-  });
+  }
 
-  return snippets.length > 0 ? snippets : null;
+  return results.length > 0 ? results : null;
 }
 
 export async function searchPublicDiscussion(

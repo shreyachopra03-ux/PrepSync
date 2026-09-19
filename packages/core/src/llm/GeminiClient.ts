@@ -7,6 +7,7 @@ const MODEL_NAME = "gemini-3.6-flash";
 const CHARS_PER_TOKEN_ESTIMATE = 4;
 
 export interface GeminiClientOptions {
+  baseUrl?: string;
   requestsPerMinute: number;
   tokensPerMinute: number;
 }
@@ -36,7 +37,10 @@ export class GeminiClient implements LLMClient {
 
   constructor(apiKey: string, options: GeminiClientOptions) {
     const genAI = new GoogleGenerativeAI(apiKey);
-    this.model = genAI.getGenerativeModel({ model: MODEL_NAME });
+    this.model = genAI.getGenerativeModel(
+      { model: MODEL_NAME },
+      options.baseUrl ? { baseUrl: options.baseUrl } : undefined
+    );
     this.tokenBucket = new TokenBucket(options);
   }
 

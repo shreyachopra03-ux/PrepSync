@@ -1,5 +1,6 @@
 import type { Requirement, Question } from "../validate/kitSchema";
 import type { LLMClient } from "../llm/LLMClient";
+import { inlineRunStep, type RunStep } from "../pipeline/runStep";
 import { checkCoverage } from "./checkCoverage";
 import { fillGaps } from "./fillGaps";
 
@@ -14,7 +15,8 @@ export interface CoverageLoopResult {
 export async function runCoverageLoop(
   requirements: Requirement[],
   initialQuestions: Question[],
-  llmClient: LLMClient
+  llmClient: LLMClient,
+  runStep: RunStep = inlineRunStep
 ): Promise<CoverageLoopResult> {
   let questions = initialQuestions;
   let uncovered = checkCoverage(requirements, questions);
@@ -28,7 +30,10 @@ export async function runCoverageLoop(
     if (uncoveredMustHaves.length === 0) break;
 
     const startingOrder = questions.length;
-    const newQuestions = await fillGaps(uncoveredMustHaves, requirements, startingOrder, llmClient);
+    const currentPass = passes;
+    const newQuestions = await runStep(`coverage-fill-${currentPass}`, () =>
+      fillGaps(uncoveredMustHaves, requirements, startingOrder, llmClient)
+    );
     questions = [...questions, ...newQuestions];
 
     const nextUncovered = checkCoverage(requirements, questions);

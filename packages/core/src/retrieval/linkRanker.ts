@@ -1,5 +1,4 @@
-import * as cheerio from "cheerio";
-import type { CrawledPage } from "./crawler";
+import { extractLinks, type ExtractedLink } from "./htmlLinks";
 
 const TOKENS = [
   "careers",
@@ -22,6 +21,7 @@ const TOKENS = [
 const URL_TOKEN_WEIGHT = 1;
 const ANCHOR_TOKEN_WEIGHT = 2;
 const NAV_FOOTER_BONUS = 3;
+const DEFAULT_RANKED_CAP = 60;
 
 export interface ScoredLink {
   url: string;
@@ -43,48 +43,49 @@ function urlDepth(url: string): number {
   }
 }
 
-export function rankLinksInPage(html: string, pageUrl: string): ScoredLink[] {
-  const $ = cheerio.load(html);
-  const scored: ScoredLink[] = [];
-
-  $("a[href]").each((_, el) => {
-    const href = $(el).attr("href");
-    if (!href) return;
-
-    let resolvedUrl: string;
-    try {
-      resolvedUrl = new URL(href, pageUrl).toString();
-    } catch {
-      return;
-    }
-
-    const anchorText = $(el).text().trim();
-    const urlScore = countTokenMatches(resolvedUrl) * URL_TOKEN_WEIGHT;
-    const anchorScore = countTokenMatches(anchorText) * ANCHOR_TOKEN_WEIGHT;
-    const depthPenalty = urlDepth(resolvedUrl);
-    const inNavOrFooter = $(el).parents("nav, footer").length > 0;
-    const bonus = inNavOrFooter ? NAV_FOOTER_BONUS : 0;
-
-    const score = urlScore + anchorScore + bonus - depthPenalty;
-
-    scored.push({ url: resolvedUrl, anchorText, score });
-  });
-
-  return scored;
+export function scoreLink(link: ExtractedLink): number {
+  const urlScore = countTokenMatches(link.url) * URL_TOKEN_WEIGHT;
+  const anchorScore = countTokenMatches(link.anchorText) * ANCHOR_TOKEN_WEIGHT;
+  const bonus = link.inNavOrFooter ? NAV_FOOTER_BONUS : 0;
+  return urlScore + anchorScore + bonus - urlDepth(link.url);
 }
 
-export function rankLinks(pages: CrawledPage[]): ScoredLink[] {
-  const bestByUrl = new Map<string, ScoredLink>();
+export function scoreLinks(links: ExtractedLink[]): ScoredLink[] {
+  return links.map((link) => ({
+    url: link.url,
+    anchorText: link.anchorText,
+    score: scoreLink(link),
+  }));
+}
 
-  for (const page of pages) {
-    const links = rankLinksInPage(page.html, page.url);
-    for (const link of links) {
-      const existing = bestByUrl.get(link.url);
-      if (!existing || link.score > existing.score) {
-        bestByUrl.set(link.url, link);
-      }
+export function rankLinksInPage(html: string, pageUrl: string): ScoredLink[] {
+  return scoreLinks(extractLinks(html, pageUrl));
+}
+
+export function mergeScoredLinks(
+  existing: Record<string, ScoredLink>,
+  incoming: ScoredLink[],
+  cap: number = DEFAULT_RANKED_CAP
+): Record<string, ScoredLink> {
+  const merged = { ...existing };
+
+  for (const link of incoming) {
+    const previous = merged[link.url];
+    if (!previous || link.score > previous.score) {
+      merged[link.url] = link;
     }
   }
 
-  return Array.from(bestByUrl.values()).sort((a, b) => b.score - a.score);
+  const entries = Object.values(merged);
+  if (entries.length <= cap) return merged;
+
+  const trimmed: Record<string, ScoredLink> = {};
+  for (const entry of entries.sort((a, b) => b.score - a.score).slice(0, cap)) {
+    trimmed[entry.url] = entry;
+  }
+  return trimmed;
+}
+
+export function sortScoredLinks(ranked: Record<string, ScoredLink>): ScoredLink[] {
+  return Object.values(ranked).sort((a, b) => b.score - a.score);
 }

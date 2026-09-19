@@ -1,0 +1,33 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "prepsync-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "alias": {
+    "@prepsync/core": "../../packages/core/dist/index.js"
+  },
+  "vars": {
+    "NODE_ENV": "production",
+    "ALLOW_PRIVATE_HOSTS": "false",
+    "FRONTEND_URL": "https://prep-sync-web.vercel.app"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "prepsync",
+      "database_id": "75153e53-dc5f-4dd7-aaa2-e93025cd490e",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "workflows": [
+    {
+      "name": "prepsync-run-pipeline",
+      "binding": "RUN_WORKFLOW",
+      "class_name": "RunPipelineWorkflow"
+    }
+  ],
+  "observability": {
+    "enabled": true
+  }
+}
