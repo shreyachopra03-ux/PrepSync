@@ -3,11 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { register, ApiError } from "../../../lib/api";
+import { authClient } from "../../../lib/auth-client";
+import { derivePasswordProof } from "../../../lib/passwordProof";
 import { ErrorBanner } from "../../../components/ErrorBanner";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -18,10 +20,18 @@ export default function RegisterPage() {
     setError(null);
     setSubmitting(true);
     try {
-      await register(email, password);
+      const { error: signUpError } = await authClient.signUp.email({
+        name: name.trim() || email.split("@")[0],
+        email,
+        password: await derivePasswordProof(email, password),
+      });
+      if (signUpError) {
+        setError(signUpError.message ?? "Failed to register");
+        return;
+      }
       router.push("/dashboard");
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to register");
+    } catch {
+      setError("Failed to register");
     } finally {
       setSubmitting(false);
     }
@@ -38,6 +48,17 @@ export default function RegisterPage() {
       )}
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <label className="flex flex-col gap-1 text-sm font-medium text-gray-700">
+          Name
+          <input
+            type="text"
+            autoComplete="name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="rounded-md border border-gray-300 px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-brand-500"
+          />
+        </label>
+
         <label className="flex flex-col gap-1 text-sm font-medium text-gray-700">
           Email
           <input

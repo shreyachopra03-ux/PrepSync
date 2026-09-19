@@ -1,22 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { getCurrentUser } from "../lib/api";
+import { authClient } from "../lib/auth-client";
 import { LoadingState } from "../components/LoadingState";
 
 export default function HomePage() {
   const router = useRouter();
-  const [checking, setChecking] = useState(true);
+  const { data: session, isPending } = authClient.useSession();
 
   useEffect(() => {
-    getCurrentUser()
-      .then(() => router.replace("/dashboard"))
-      .catch(() => setChecking(false));
-  }, [router]);
+    if (session) router.replace("/dashboard");
+  }, [session, router]);
 
-  if (checking) {
+  if (isPending || session) {
     return (
       <main className="flex min-h-screen items-center justify-center">
         <LoadingState message="Loading..." />

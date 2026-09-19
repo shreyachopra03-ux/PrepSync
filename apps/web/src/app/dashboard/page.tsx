@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { listKits, logout, ApiError } from "../../lib/api";
+import { listKits, ApiError } from "../../lib/api";
+import { authClient } from "../../lib/auth-client";
 import type { KitSummary } from "../../lib/types";
 import { KitCard } from "../../components/KitCard";
 import { LoadingState } from "../../components/LoadingState";
@@ -16,7 +17,7 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
 
   async function handleLogout() {
-    await logout();
+    await authClient.signOut();
     router.push("/login");
   }
 

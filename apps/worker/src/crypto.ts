@@ -26,12 +26,12 @@ export async function sha256Hex(text: string): Promise<string> {
     .join("");
 }
 
-export async function hashPassword(proof: string): Promise<string> {
+export async function hashPasswordProof(proof: string): Promise<string> {
   const salt = toBase64(crypto.getRandomValues(new Uint8Array(16)));
   return `sha256$${salt}$${await sha256Hex(`${salt}:${proof}`)}`;
 }
 
-export async function verifyPassword(proof: string, stored: string): Promise<boolean> {
+export async function verifyPasswordProof(proof: string, stored: string): Promise<boolean> {
   const [scheme, salt, hash] = stored.split("$");
   if (scheme !== "sha256" || !salt || !hash) return false;
   return timingSafeEqual(await sha256Hex(`${salt}:${proof}`), hash);

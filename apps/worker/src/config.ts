@@ -10,9 +10,9 @@ export function allowedOrigin(env: Env): string | undefined {
 
 export function assertConfigured(env: Env): void {
   const missing: string[] = [];
-  if (!env.JWT_SECRET) missing.push("JWT_SECRET");
+  if (!env.BETTER_AUTH_SECRET) missing.push("BETTER_AUTH_SECRET");
   if (!env.GEMINI_API_KEY) missing.push("GEMINI_API_KEY");
-  if (isProduction(env) && !allowedOrigin(env)) missing.push("FRONTEND_URL");
+  if (!allowedOrigin(env)) missing.push("FRONTEND_URL");
 
   if (missing.length > 0) {
     throw new Error(`Missing configuration: ${missing.join(", ")}`);

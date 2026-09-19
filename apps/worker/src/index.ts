@@ -3,7 +3,7 @@ import { cors } from "hono/cors";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { allowedOrigin, assertConfigured, isProduction } from "./config";
 import { HttpError } from "./errors";
-import { authRoutes } from "./routes/auth";
+import { getAuth } from "./auth";
 import { kitsRoutes } from "./routes/kits";
 import { practiceRoutes } from "./routes/practice";
 import { runsRoutes } from "./routes/runs";
@@ -30,7 +30,7 @@ app.use("*", async (c, next) => {
   await next();
 });
 
-app.route("/auth", authRoutes);
+app.on(["GET", "POST"], "/api/auth/*", (c) => getAuth(c.env).handler(c.req.raw));
 app.route("/kits", kitsRoutes);
 app.route("/runs", runsRoutes);
 app.route("/practice", practiceRoutes);

@@ -1,7 +1,7 @@
 export interface Env {
   DB: D1Database;
   RUN_WORKFLOW: Workflow;
-  JWT_SECRET: string;
+  BETTER_AUTH_SECRET: string;
   GEMINI_API_KEY: string;
   TAVILY_API_KEY?: string;
   GEMINI_BASE_URL?: string;

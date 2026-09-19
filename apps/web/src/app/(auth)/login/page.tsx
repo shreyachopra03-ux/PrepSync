@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { login, ApiError } from "../../../lib/api";
+import { authClient } from "../../../lib/auth-client";
+import { derivePasswordProof } from "../../../lib/passwordProof";
 import { ErrorBanner } from "../../../components/ErrorBanner";
 
 export default function LoginPage() {
@@ -18,10 +19,17 @@ export default function LoginPage() {
     setError(null);
     setSubmitting(true);
     try {
-      await login(email, password);
+      const { error: signInError } = await authClient.signIn.email({
+        email,
+        password: await derivePasswordProof(email, password),
+      });
+      if (signInError) {
+        setError(signInError.message ?? "Failed to log in");
+        return;
+      }
       router.push("/dashboard");
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to log in");
+    } catch {
+      setError("Failed to log in");
     } finally {
       setSubmitting(false);
     }
