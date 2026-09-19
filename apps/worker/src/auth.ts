@@ -34,6 +34,10 @@ function createAuth(env: Env) {
         verify: async ({ hash, password }) => verifyPasswordProof(password, hash),
       },
     },
+    socialProviders:
+      env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
+        ? { google: { clientId: env.GOOGLE_CLIENT_ID, clientSecret: env.GOOGLE_CLIENT_SECRET } }
+        : {},
     advanced: {
       useSecureCookies: isProduction(env),
       ipAddress: { ipAddressHeaders: ["x-forwarded-for", "cf-connecting-ip"] },

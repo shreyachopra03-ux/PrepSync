@@ -5,6 +5,8 @@ export interface Env {
   GEMINI_API_KEY: string;
   TAVILY_API_KEY?: string;
   GEMINI_BASE_URL?: string;
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
   FRONTEND_URL?: string;
   NODE_ENV?: string;
   ALLOW_PRIVATE_HOSTS?: string;
