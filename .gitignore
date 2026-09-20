@@ -13,6 +13,5 @@ Thumbs.db
 *.tsbuildinfo
 .vscode/
 kits.json
-
 .dev.vars
 .wrangler/
