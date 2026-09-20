@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { btnSmall, btnSmallPrimary } from "./ds";
 
 interface RegenerateButtonProps {
   sectionLabel: string;
@@ -19,7 +20,7 @@ export function RegenerateButton({
 
   if (confirming) {
     return (
-      <div className="flex flex-col gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+      <div className="flex max-w-sm flex-col gap-3 rounded-md border border-ink/70 bg-blush p-3.5 text-sm leading-relaxed text-ink">
         <p>
           This will replace {sectionLabel} you haven&apos;t edited or pinned.
           {pinnedCount > 0
@@ -33,15 +34,11 @@ export function RegenerateButton({
               onConfirm();
               setConfirming(false);
             }}
-            className="rounded-md bg-amber-600 px-3 py-1 text-xs font-medium text-white hover:bg-amber-700"
+            className={btnSmallPrimary}
           >
             Regenerate
           </button>
-          <button
-            type="button"
-            onClick={() => setConfirming(false)}
-            className="rounded-md border border-amber-300 px-3 py-1 text-xs font-medium hover:bg-amber-100"
-          >
+          <button type="button" onClick={() => setConfirming(false)} className={btnSmall}>
             Cancel
           </button>
         </div>
@@ -50,12 +47,7 @@ export function RegenerateButton({
   }
 
   return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={() => setConfirming(true)}
-      className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-brand-500"
-    >
+    <button type="button" disabled={disabled} onClick={() => setConfirming(true)} className={btnSmall}>
       Regenerate {sectionLabel}
     </button>
   );

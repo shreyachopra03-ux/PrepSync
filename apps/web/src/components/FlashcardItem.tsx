@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { Flashcard } from "../lib/types";
+import { Card, Label, StatusBadge, btnSmall, btnSmallDanger, btnSmallPrimary, inputClass } from "./ds";
 
 interface FlashcardItemProps {
   flashcard: Flashcard;
@@ -21,82 +22,61 @@ export function FlashcardItem({ flashcard, onEdit, onDelete, onTogglePin }: Flas
   }
 
   return (
-    <li className="rounded-md border border-gray-200 bg-white p-3">
-      <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-gray-500">
-        {flashcard.origin === "edited" && (
-          <span className="rounded-full bg-blue-100 px-2 py-0.5 text-blue-700">Edited</span>
-        )}
-        {flashcard.origin === "manual" && (
-          <span className="rounded-full bg-purple-100 px-2 py-0.5 text-purple-700">Manual</span>
-        )}
-        {flashcard.pinned && (
-          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-700">Pinned</span>
-        )}
-      </div>
+    <li>
+      <Card className={`h-full p-4 ${flashcard.pinned ? "!bg-[#F6F9DA]" : ""}`}>
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <Label className="text-ink/45">Card</Label>
+          {flashcard.origin === "edited" && <StatusBadge tone="blush">Edited</StatusBadge>}
+          {flashcard.origin === "manual" && <StatusBadge tone="blush">Manual</StatusBadge>}
+          {flashcard.pinned && <StatusBadge tone="lime">Pinned</StatusBadge>}
+        </div>
 
-      {isEditing ? (
-        <div className="flex flex-col gap-2">
-          <textarea
-            value={draftFront}
-            onChange={(e) => setDraftFront(e.target.value)}
-            rows={2}
-            className="rounded-md border border-gray-300 px-2 py-1 text-sm focus-visible:outline-2 focus-visible:outline-brand-500"
-          />
-          <textarea
-            value={draftBack}
-            onChange={(e) => setDraftBack(e.target.value)}
-            rows={2}
-            className="rounded-md border border-gray-300 px-2 py-1 text-sm focus-visible:outline-2 focus-visible:outline-brand-500"
-          />
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={saveEdit}
-              className="rounded-md bg-brand-500 px-3 py-1 text-xs font-medium text-white hover:bg-brand-600"
-            >
-              Save
+        {isEditing ? (
+          <div className="flex flex-col gap-3">
+            <textarea
+              value={draftFront}
+              onChange={(e) => setDraftFront(e.target.value)}
+              rows={2}
+              aria-label="Front"
+              className={inputClass}
+            />
+            <textarea
+              value={draftBack}
+              onChange={(e) => setDraftBack(e.target.value)}
+              rows={3}
+              aria-label="Back"
+              className={inputClass}
+            />
+            <div className="flex gap-2">
+              <button type="button" onClick={saveEdit} className={btnSmallPrimary}>
+                Save
+              </button>
+              <button type="button" onClick={() => setIsEditing(false)} className={btnSmall}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <p className="font-display text-base font-medium leading-snug text-ink">{flashcard.front}</p>
+            <p className="mt-2 border-l-2 border-ink/25 pl-3 text-sm leading-relaxed text-ink-soft">{flashcard.back}</p>
+          </>
+        )}
+
+        {!isEditing && (
+          <div className="mt-4 flex flex-wrap gap-2 border-t border-dashed border-ink/25 pt-3">
+            <button type="button" onClick={() => setIsEditing(true)} className={btnSmall}>
+              Edit
             </button>
-            <button
-              type="button"
-              onClick={() => setIsEditing(false)}
-              className="rounded-md border border-gray-300 px-3 py-1 text-xs font-medium hover:bg-gray-50"
-            >
-              Cancel
+            <button type="button" onClick={onTogglePin} className={btnSmall}>
+              {flashcard.pinned ? "Unpin" : "Pin"}
+            </button>
+            <button type="button" onClick={onDelete} className={`${btnSmallDanger} ml-auto`}>
+              Delete
             </button>
           </div>
-        </div>
-      ) : (
-        <>
-          <p className="text-sm font-medium text-gray-900">{flashcard.front}</p>
-          <p className="mt-1 text-sm text-gray-600">{flashcard.back}</p>
-        </>
-      )}
-
-      {!isEditing && (
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => setIsEditing(true)}
-            className="rounded-md border border-gray-300 px-2 py-1 text-xs font-medium hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-brand-500"
-          >
-            Edit
-          </button>
-          <button
-            type="button"
-            onClick={onTogglePin}
-            className="rounded-md border border-gray-300 px-2 py-1 text-xs font-medium hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-brand-500"
-          >
-            {flashcard.pinned ? "Unpin" : "Pin"}
-          </button>
-          <button
-            type="button"
-            onClick={onDelete}
-            className="ml-auto rounded-md border border-red-300 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-red-500"
-          >
-            Delete
-          </button>
-        </div>
-      )}
+        )}
+      </Card>
     </li>
   );
 }

@@ -1,11 +1,17 @@
+import { AuthShell } from "@/components/ds";
 import { SignupForm } from "@/components/signup-form";
 
 export default function Page() {
   return (
-    <div className="flex min-h-svh w-full items-center justify-center p-4">
-      <div className="w-full max-w-xs">
-        <SignupForm />
-      </div>
-    </div>
-  )
+    <AuthShell
+      label="AI interview prep"
+      title="Start preparing smarter."
+      description="Turn any job description and company website into a focused, editable interview prep kit."
+      switchPrompt="Already have an account?"
+      switchLabel="Log in"
+      switchHref="/login"
+    >
+      <SignupForm />
+    </AuthShell>
+  );
 }

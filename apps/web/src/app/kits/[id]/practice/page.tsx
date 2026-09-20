@@ -8,6 +8,7 @@ import { LoadingState } from "../../../../components/LoadingState";
 import { ErrorBanner } from "../../../../components/ErrorBanner";
 import { EmptyState } from "../../../../components/EmptyState";
 import { FlashcardPractice } from "../../../../components/FlashcardPractice";
+import { AppShell, Label, PageHeader, SecondaryLink } from "../../../../components/ds";
 
 export default function PracticePage({ params }: { params: { id: string } }) {
   const kitId = params.id;
@@ -49,16 +50,32 @@ export default function PracticePage({ params }: { params: { id: string } }) {
     }
   }
 
+  const total = progress ? progress.coveredRequirementIds.length + progress.uncoveredRequirementIds.length : 0;
+  const covered = progress ? progress.coveredRequirementIds.length : 0;
+
   return (
-    <main className="mx-auto max-w-2xl px-4 py-10">
-      <h1 className="mb-2 text-center text-2xl font-semibold text-gray-900">Practice</h1>
+    <AppShell width="max-w-2xl">
+      <PageHeader
+        label="Practice"
+        title="One card at a time."
+        actions={<SecondaryLink href={`/kits/${kitId}`}>Back to kit</SecondaryLink>}
+      />
 
       {progress && (
-        <p className="mb-8 text-center text-sm text-gray-500">
-          {progress.coveredRequirementIds.length} of{" "}
-          {progress.coveredRequirementIds.length + progress.uncoveredRequirementIds.length}{" "}
-          requirements covered
-        </p>
+        <div className="mb-8">
+          <div className="mb-2 flex items-center justify-between">
+            <Label className="text-ink-soft">Requirements covered</Label>
+            <Label className="text-ink-soft">
+              {covered} of {total}
+            </Label>
+          </div>
+          <div className="h-1.5 overflow-hidden rounded-full bg-ink/10">
+            <div
+              className="h-full rounded-full bg-ink transition-all duration-500"
+              style={{ width: total > 0 ? `${(covered / total) * 100}%` : "0%" }}
+            />
+          </div>
+        </div>
       )}
 
       {error && (
@@ -67,11 +84,12 @@ export default function PracticePage({ params }: { params: { id: string } }) {
         </div>
       )}
 
-      {!error && loading && <LoadingState message="Loading next card..." />}
+      {!error && loading && <LoadingState message="Loading next card" />}
 
       {!error && !loading && !card && (
         <EmptyState
-          title="No flashcards to practice"
+          label="Practice"
+          title="No flashcards to practise."
           description="This kit doesn't have any flashcards yet."
         />
       )}
@@ -79,6 +97,6 @@ export default function PracticePage({ params }: { params: { id: string } }) {
       {!error && !loading && card && (
         <FlashcardPractice card={card} onSubmitConfidence={handleConfidence} submitting={submitting} />
       )}
-    </main>
+    </AppShell>
   );
 }

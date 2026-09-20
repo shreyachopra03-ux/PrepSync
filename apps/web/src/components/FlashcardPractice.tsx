@@ -2,12 +2,19 @@
 
 import { useEffect, useState } from "react";
 import type { Flashcard } from "../lib/types";
+import { Card, Label, PrimaryButton, btnSecondary } from "./ds";
 
 interface FlashcardPracticeProps {
   card: Flashcard;
   onSubmitConfidence: (confidence: 1 | 2 | 3) => void;
   submitting?: boolean;
 }
+
+const RATINGS: { value: 1 | 2 | 3; label: string; tone: string }[] = [
+  { value: 1, label: "Again", tone: "hover:!bg-blush" },
+  { value: 2, label: "Good", tone: "hover:!bg-sky" },
+  { value: 3, label: "Easy", tone: "hover:!bg-lime" },
+];
 
 export function FlashcardPractice({ card, onSubmitConfidence, submitting }: FlashcardPracticeProps) {
   const [revealed, setRevealed] = useState(false);
@@ -17,46 +24,42 @@ export function FlashcardPractice({ card, onSubmitConfidence, submitting }: Flas
   }, [card.id]);
 
   return (
-    <div className="mx-auto flex max-w-md flex-col items-center gap-6">
-      <div className="flex min-h-[10rem] w-full flex-col items-center justify-center rounded-lg border border-gray-200 bg-white p-6 text-center shadow-sm">
-        <p className="text-lg font-medium text-gray-900">{card.front}</p>
-        {revealed && <p className="mt-4 text-sm text-gray-600">{card.back}</p>}
-      </div>
+    <div className="flex flex-col gap-6">
+      <Card tone={revealed ? "sky" : "paper"} className="flex min-h-[15rem] flex-col justify-center p-7 sm:p-10">
+        <Label className="text-ink/50">{revealed ? "Answer" : "Question"}</Label>
+        <p className="mt-3 font-display text-2xl font-medium leading-snug tracking-tight text-ink sm:text-3xl">
+          {card.front}
+        </p>
+        {revealed && (
+          <p className="mt-5 border-t border-dashed border-ink/30 pt-5 text-[0.95rem] leading-relaxed text-ink-soft">
+            {card.back}
+          </p>
+        )}
+      </Card>
 
       {!revealed ? (
-        <button
-          type="button"
-          onClick={() => setRevealed(true)}
-          className="rounded-md bg-brand-500 px-5 py-2 text-sm font-medium text-white hover:bg-brand-600 focus-visible:outline-2 focus-visible:outline-brand-700"
-        >
-          Reveal answer
-        </button>
+        <div>
+          <PrimaryButton type="button" onClick={() => setRevealed(true)}>
+            Reveal answer
+          </PrimaryButton>
+        </div>
       ) : (
-        <div className="flex gap-3">
-          <button
-            type="button"
-            disabled={submitting}
-            onClick={() => onSubmitConfidence(1)}
-            className="rounded-md border border-red-300 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
-          >
-            Again
-          </button>
-          <button
-            type="button"
-            disabled={submitting}
-            onClick={() => onSubmitConfidence(2)}
-            className="rounded-md border border-amber-300 px-4 py-2 text-sm font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-50"
-          >
-            Good
-          </button>
-          <button
-            type="button"
-            disabled={submitting}
-            onClick={() => onSubmitConfidence(3)}
-            className="rounded-md border border-green-300 px-4 py-2 text-sm font-medium text-green-700 hover:bg-green-50 disabled:opacity-50"
-          >
-            Easy
-          </button>
+        <div>
+          <Label className="text-ink-soft">How did that feel?</Label>
+          <div className="mt-3 flex flex-wrap gap-3">
+            {RATINGS.map((rating) => (
+              <button
+                key={rating.value}
+                type="button"
+                disabled={submitting}
+                onClick={() => onSubmitConfidence(rating.value)}
+                className={`${btnSecondary} min-w-[6rem] ${rating.tone}`}
+              >
+                <span className="font-mono text-[0.65rem] text-ink/50">{rating.value}</span>
+                {rating.label}
+              </button>
+            ))}
+          </div>
         </div>
       )}
     </div>

@@ -1,4 +1,5 @@
 import type { ScheduleDay as ScheduleDayType, Question } from "../lib/types";
+import { Card, Label, StatusBadge } from "./ds";
 
 interface ScheduleDayProps {
   day: ScheduleDayType;
@@ -9,24 +10,29 @@ export function ScheduleDay({ day, questions }: ScheduleDayProps) {
   const questionsById = new Map(questions.map((q) => [q.id, q]));
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4">
-      <div className="mb-2 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-gray-900">Day {day.day}</h3>
-        <span className="text-xs text-gray-500">{day.minutes} min</span>
+    <Card interactive className="p-5">
+      <div className="mb-3 flex items-center justify-between">
+        <div className="flex items-baseline gap-2">
+          <span className="font-display text-4xl leading-none text-transparent [-webkit-text-stroke:1.2px_#0F1729]">
+            {String(day.day).padStart(2, "0")}
+          </span>
+          <Label className="text-ink-soft">Day {day.day}</Label>
+        </div>
+        <StatusBadge>{day.minutes} min</StatusBadge>
       </div>
-      <p className="mb-3 text-xs font-medium text-brand-600">{day.focus}</p>
+      <p className="mb-3 font-display text-base italic leading-snug text-ink">{day.focus}</p>
 
       {day.question_ids.length === 0 ? (
-        <p className="text-xs text-gray-400">No material scheduled</p>
+        <p className="text-xs text-ink/50">No material scheduled</p>
       ) : (
-        <ul className="flex flex-col gap-1">
+        <ul className="flex flex-col gap-1.5 border-t border-dashed border-ink/25 pt-3">
           {day.question_ids.map((id) => {
             const question = questionsById.get(id);
             return (
               <li key={id}>
                 <a
                   href={`#question-${id}`}
-                  className="block text-xs text-gray-600 hover:text-brand-600 hover:underline focus-visible:outline-2 focus-visible:outline-brand-500"
+                  className="block text-xs leading-relaxed text-ink-soft underline-offset-2 transition-colors hover:text-ink hover:underline"
                 >
                   {question ? question.prompt : id}
                 </a>
@@ -35,6 +41,6 @@ export function ScheduleDay({ day, questions }: ScheduleDayProps) {
           })}
         </ul>
       )}
-    </div>
+    </Card>
   );
 }

@@ -31,6 +31,7 @@ export function identify(userId: string): void {
   if (!init()) return;
   try {
     mixpanel.identify(userId);
+    mixpanel.people.set({ last_seen_app: new Date().toISOString() });
   } catch {}
 }
 

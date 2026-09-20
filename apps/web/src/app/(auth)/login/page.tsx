@@ -1,11 +1,17 @@
+import { AuthShell } from "@/components/ds"
 import { LoginForm } from "@/components/login-form"
 
 export default function Page() {
   return (
-    <div className="flex min-h-svh w-full items-center justify-center p-4">
-      <div className="w-full max-w-xs">
-        <LoginForm />
-      </div>
-    </div>
+    <AuthShell
+      label="AI interview prep"
+      title="Pick up where you left off."
+      description="Your prep kits, questions and schedules are right where you left them."
+      switchPrompt="New to PrepSync?"
+      switchLabel="Create an account"
+      switchHref="/register"
+    >
+      <LoginForm />
+    </AuthShell>
   )
 }
