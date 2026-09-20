@@ -8,7 +8,7 @@ async function main(): Promise<void> {
   const app = createApp();
 
   app.listen(env.PORT, () => {
-    console.log(`PrepSync API listening on port ${env.PORT} (${env.NODE_ENV})`);
+    console.log(`Server is listening on port ${env.PORT} (${env.NODE_ENV})`);
   });
 }
 
