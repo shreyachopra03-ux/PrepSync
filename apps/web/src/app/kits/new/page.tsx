@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createKit, ApiError } from "../../../lib/api";
 import { ErrorBanner } from "../../../components/ErrorBanner";
+import { track } from "../../../lib/analytics";
 
 export default function NewKitPage() {
   const router = useRouter();
@@ -19,6 +20,7 @@ export default function NewKitPage() {
     setSubmitting(true);
     try {
       const result = await createKit({ jd, company_url: companyUrl, days });
+      track("kit_generation_started", { days });
       router.push(`/kits/${result.runId}/generating`);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to start kit generation");

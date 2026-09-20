@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { listKits, ApiError } from "../../lib/api";
 import { authClient } from "../../lib/auth-client";
+import { resetIdentity, track } from "../../lib/analytics";
 import type { KitSummary } from "../../lib/types";
 import { KitCard } from "../../components/KitCard";
 import { LoadingState } from "../../components/LoadingState";
@@ -17,7 +18,9 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
 
   async function handleLogout() {
+    track("logout_clicked");
     await authClient.signOut();
+    resetIdentity();
     router.push("/login");
   }
 

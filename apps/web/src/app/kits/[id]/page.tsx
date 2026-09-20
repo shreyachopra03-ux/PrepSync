@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { getKit, patchKit, regenerateSection, ApiError } from "../../../lib/api";
+import { track } from "../../../lib/analytics";
 import type { Kit, Question, Flashcard } from "../../../lib/types";
 import { LoadingState } from "../../../components/LoadingState";
 import { ErrorBanner } from "../../../components/ErrorBanner";
@@ -120,6 +121,7 @@ export default function KitViewPage({ params }: { params: { id: string } }) {
     setRegenerating(section);
     try {
       const result = await regenerateSection(kitId, section, kit.version);
+      track("kit_section_regenerated", { section });
       setKit(result.kit);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : `Failed to regenerate ${section}`);

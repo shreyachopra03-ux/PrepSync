@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getNextPracticeCard, submitPracticeConfidence, ApiError } from "../../../../lib/api";
+import { track } from "../../../../lib/analytics";
 import type { Flashcard, PracticeProgress } from "../../../../lib/types";
 import { LoadingState } from "../../../../components/LoadingState";
 import { ErrorBanner } from "../../../../components/ErrorBanner";
@@ -39,6 +40,7 @@ export default function PracticePage({ params }: { params: { id: string } }) {
     setSubmitting(true);
     try {
       await submitPracticeConfidence(kitId, card.id, confidence);
+      track("practice_card_rated", { confidence });
       await loadNext();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to save your answer");

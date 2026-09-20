@@ -6,6 +6,7 @@ import { getRun, ApiError } from "../../../../lib/api";
 import type { Run } from "../../../../lib/types";
 import { LoadingState } from "../../../../components/LoadingState";
 import { ErrorBanner } from "../../../../components/ErrorBanner";
+import { track } from "../../../../lib/analytics";
 
 const POLL_INTERVAL_MS = 2000;
 
@@ -39,11 +40,13 @@ export default function GeneratingPage({ params }: { params: { id: string } }) {
         setRun(latest);
 
         if (latest.status === "done" && latest.kitId) {
+          track("kit_generation_succeeded");
           router.push(`/kits/${latest.kitId}`);
           return;
         }
 
         if (latest.status === "failed") {
+          track("kit_generation_failed");
           setError(latest.error ?? "Kit generation failed");
           return;
         }

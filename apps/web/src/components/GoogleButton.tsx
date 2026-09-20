@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { authClient } from "../lib/auth-client";
+import { Button } from "./ui/button";
 
 interface GoogleButtonProps {
   onError: (message: string) => void;
@@ -31,13 +32,8 @@ export function GoogleButton({ onError, label = "Continue with Google" }: Google
   }
 
   return (
-    <button
-      type="button"
-      onClick={handleClick}
-      disabled={pending}
-      className="flex w-full items-center justify-center gap-3 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-brand-500"
-    >
-      <svg aria-hidden="true" width="18" height="18" viewBox="0 0 48 48">
+    <Button type="button" variant="outline" className="w-full" onClick={handleClick} disabled={pending}>
+      <svg aria-hidden="true" viewBox="0 0 48 48">
         <path
           fill="#EA4335"
           d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
@@ -56,6 +52,6 @@ export function GoogleButton({ onError, label = "Continue with Google" }: Google
         />
       </svg>
       {pending ? "Redirecting..." : label}
-    </button>
+    </Button>
   );
 }
