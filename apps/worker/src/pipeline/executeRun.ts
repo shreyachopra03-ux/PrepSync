@@ -1,10 +1,12 @@
-import { GeminiClient, type PipelineLimits, type PipelineStepName } from "@prepsync/core";
+import {
+  createLlmClient,
+  type LLMClient,
+  type PipelineLimits,
+  type PipelineStepName,
+} from "@prepsync/core";
 import { newId } from "../crypto";
 import { nowIso } from "../db";
 import type { Env } from "../types";
-
-const GEMINI_FLASH_FREE_TIER_RPM = 15;
-const GEMINI_FLASH_FREE_TIER_TPM = 250_000;
 
 export const WORKER_LIMITS: PipelineLimits = {
   maxPages: 12,
@@ -23,17 +25,27 @@ interface StoredStep {
   note: string;
 }
 
-let cachedClient: { key: string; client: GeminiClient } | null = null;
+let cachedClient: { key: string; client: LLMClient } | null = null;
 
-export function getLlmClient(env: Env): GeminiClient {
-  const key = `${env.GEMINI_API_KEY}|${env.GEMINI_BASE_URL ?? ""}`;
+export function getLlmClient(env: Env): LLMClient {
+  const key = [
+    env.NVIDIA_API_KEY,
+    env.GROQ_API_KEY,
+    env.GEMINI_API_KEY,
+    env.NVIDIA_BASE_URL,
+    env.GROQ_BASE_URL,
+    env.GEMINI_BASE_URL,
+  ].join('|');
   if (!cachedClient || cachedClient.key !== key) {
     cachedClient = {
       key,
-      client: new GeminiClient(env.GEMINI_API_KEY, {
-        baseUrl: env.GEMINI_BASE_URL,
-        requestsPerMinute: GEMINI_FLASH_FREE_TIER_RPM,
-        tokensPerMinute: GEMINI_FLASH_FREE_TIER_TPM,
+      client: createLlmClient({
+        nvidiaApiKey: env.NVIDIA_API_KEY,
+        groqApiKey: env.GROQ_API_KEY,
+        geminiApiKey: env.GEMINI_API_KEY,
+        nvidiaBaseUrl: env.NVIDIA_BASE_URL,
+        groqBaseUrl: env.GROQ_BASE_URL,
+        geminiBaseUrl: env.GEMINI_BASE_URL,
       }),
     };
   }

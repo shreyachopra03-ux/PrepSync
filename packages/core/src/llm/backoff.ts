@@ -1,8 +1,10 @@
-const MAX_ATTEMPTS = 4;
+const DEFAULT_MAX_ATTEMPTS = 4;
 const BASE_DELAY_MS = 500;
 
 export interface BackoffOptions {
+  maxAttempts?: number;
   getRetryAfterMs?: (error: unknown) => number | null;
+  shouldRetry?: (error: unknown) => boolean;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -19,15 +21,16 @@ export async function withBackoff<T>(
   fn: () => Promise<T>,
   options: BackoffOptions = {}
 ): Promise<T> {
+  const maxAttempts = options.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
   let lastError: unknown;
 
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       return await fn();
     } catch (error) {
       lastError = error;
 
-      if (attempt >= MAX_ATTEMPTS) {
+      if (attempt >= maxAttempts || options.shouldRetry?.(error) === false) {
         break;
       }
 

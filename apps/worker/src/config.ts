@@ -11,7 +11,9 @@ export function allowedOrigin(env: Env): string | undefined {
 export function assertConfigured(env: Env): void {
   const missing: string[] = [];
   if (!env.BETTER_AUTH_SECRET) missing.push("BETTER_AUTH_SECRET");
-  if (!env.GEMINI_API_KEY) missing.push("GEMINI_API_KEY");
+  if (!env.NVIDIA_API_KEY && !env.GROQ_API_KEY && !env.GEMINI_API_KEY) {
+    missing.push("NVIDIA_API_KEY, GROQ_API_KEY or GEMINI_API_KEY (at least one)");
+  }
   if (!allowedOrigin(env)) missing.push("FRONTEND_URL");
 
   if (missing.length > 0) {

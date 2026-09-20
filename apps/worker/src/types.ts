@@ -2,8 +2,12 @@ export interface Env {
   DB: D1Database;
   RUN_WORKFLOW: Workflow;
   BETTER_AUTH_SECRET: string;
-  GEMINI_API_KEY: string;
+  NVIDIA_API_KEY?: string;
+  GROQ_API_KEY?: string;
+  GEMINI_API_KEY?: string;
   TAVILY_API_KEY?: string;
+  NVIDIA_BASE_URL?: string;
+  GROQ_BASE_URL?: string;
   GEMINI_BASE_URL?: string;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;

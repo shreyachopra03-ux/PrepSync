@@ -3,6 +3,10 @@ export * from "./validate/index";
 
 export type { LLMClient } from "./llm/LLMClient";
 export { GeminiClient } from "./llm/GeminiClient";
+export { OpenAICompatibleClient } from "./llm/OpenAICompatibleClient";
+export { FallbackLLMClient } from "./llm/FallbackLLMClient";
+export { createLlmClient, NVIDIA_MODEL, GROQ_MODEL } from "./llm/createLlmClient";
+export type { LlmProvidersConfig } from "./llm/createLlmClient";
 export { TokenBucket } from "./llm/tokenBucket";
 export { withBackoff } from "./llm/backoff";
 export { stripCodeFences, parseJsonWithRepair } from "./llm/repairJson";
